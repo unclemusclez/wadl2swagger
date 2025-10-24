@@ -61,3 +61,7 @@ openstack/
 site/source/rackspace
 site/source/openstack
 
+#
+.env
+.venv
+__pycache__
