@@ -1,21 +1,8 @@
-import pypandoc
-from wadllib.application import Application, Resource, WADLError
-from lxml import etree
-
-# etree & ElementTree :(
-try:
-    import xml.etree.cElementTree as ET
-except ImportError:
-    try:
-        import cElementTree as ET
-    except ImportError:
-        import elementtree.ElementTree as ET
-# import urlparse
-import urllib
+import xml.etree.ElementTree as ET
 from urllib.request import pathname2url
-from urllib.parse import urlparse
 from urllib.parse import urljoin
-import logging
+import pypandoc
+from wadllib.application import Application
 
 
 class BadWADLError(Exception):
@@ -100,10 +87,11 @@ class DocHelper:
         for e in doc_tag.iter():
             if "xmlns:map" in e.attrib:
                 del e.attrib["xmlns:map"]
-        doc_tag_source = ET.tostring(doc_tag)
+        doc_tag_source = ET.tostring(doc_tag).decode("utf-8")
         markdown = pypandoc.convert_file(
             doc_tag_source, "markdown_github", format="docbook"
         )
-        return pypandoc.convert_file(
-            doc_tag_source, "markdown_github", format="docbook"
-        )
+        # return pypandoc.convert_file(
+        #     doc_tag_source, "markdown_github", format="docbook"
+        # )
+        return markdown
