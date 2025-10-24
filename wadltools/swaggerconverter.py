@@ -5,7 +5,6 @@ import yaml
 import textwrap
 import logging
 from collections import OrderedDict
-import wadllib
 from wadltools.wadl import WADL, DocHelper, BadWADLError
 from wadllib.application import Parameter, WADLError, UnsupportedMediaTypeError
 
@@ -126,6 +125,44 @@ class SwaggerConverter:
         # Handle response
         self._process_response(method, swagger_method)
 
+    def _process_resources(
+        self, resource_elements, base_path="", wadl=None, swagger=None
+    ):
+        """Recursively process resource elements to handle nested resources."""
+        for resource_element in resource_elements:
+            path = resource_element.attrib.get("path", "")
+            if base_path and path and not path.startswith("/"):
+                path = base_path + "/" + path
+            if not path.startswith("/"):
+                path = "/" + path
+            assert wadl is not None, "WADL object cannot be None"
+            resource = wadl.get_resource_by_path(path)
+            if resource is None:
+                self.logger.warning("Resource not found for path: %s", path)
+                continue
+            if self.autofix and not path.startswith("/"):
+                self.logger.warning("Autofix: Adding leading / to path")
+                path = "/" + path
+            assert swagger is not None, "Swagger object cannot be None"
+            swagger_resource = swagger["paths"][path] = OrderedDict()
+            self.logger.debug("  Processing resource for %s", path)
+            # Process resource parameters
+            self._process_resource_parameters(resource, path, swagger_resource)
+
+            for method in resource.method_iter:
+                self._process_method(method, resource, path, swagger_resource)
+            # Process nested resources
+            nested_resources_elements = resource_element.findall(
+                "./" + WADL.qname("wadl", "resources")
+            )
+            for nested in nested_resources_elements:
+                self._process_resources(
+                    nested.findall("./" + WADL.qname("wadl", "resource")),
+                    path,
+                    wadl,
+                    swagger,
+                )
+
     def _process_response(self, method, swagger_method):
         """Process response and handle status autofix."""
         if method.response.tag is not None:
@@ -214,22 +251,7 @@ class SwaggerConverter:
 
             swagger["paths"] = OrderedDict()
 
-            for resource_element in wadl.resources or []:
-                path = resource_element.attrib["path"]
-                resource = wadl.get_resource_by_path(path)
-                if resource is None:
-                    self.logger.warning("Resource not found for path: %s", path)
-                    continue
-                if self.autofix and not path.startswith("/"):
-                    self.logger.warning("Autofix: Adding leading / to path")
-                    path = "/" + path
-                swagger_resource = swagger["paths"][path] = OrderedDict()
-                self.logger.debug("  Processing resource for %s", path)
-                # Process resource parameters
-                self._process_resource_parameters(resource, path, swagger_resource)
-
-                for method in resource.method_iter:
-                    self._process_method(method, resource, path, swagger_resource)
+            self._process_resources(wadl.resources or [], "", wadl, swagger)
             swagger = merge_dicts(swagger, defaults)
             return swagger
         except WADLError as e:
@@ -348,6 +370,11 @@ class SwaggerConverter:
             if param["in"] == "body":
                 self.logger.warning(
                     "Ignoring body parameter, converting these is not yet supported..."
+                )
+                return None
+            if param["in"] == "unknown":
+                self.logger.warning(
+                    "Unknown parameter style for %s, skipping", wadl_param.name
                 )
                 return None
             if param["in"] == "path":
