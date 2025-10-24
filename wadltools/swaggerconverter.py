@@ -346,7 +346,7 @@ def quoted_presenter(dumper, data):
 yaml.add_representer(quoted, quoted_presenter)
 
 
-class folded(unicode):
+class folded(str):
     pass
 
 
@@ -355,7 +355,7 @@ def folded_presenter(dumper, data):
 yaml.add_representer(folded, folded_presenter)
 
 
-class literal(unicode):
+class literal(str):
     pass
 
 

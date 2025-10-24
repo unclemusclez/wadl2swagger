@@ -9,8 +9,9 @@ except ImportError:
         import cElementTree as ET
     except ImportError:
         import elementtree.ElementTree as ET
-import urlparse
+# import urlparse
 import urllib
+from urllib.parse import urlparse
 import logging
 
 
