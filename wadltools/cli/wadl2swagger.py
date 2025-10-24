@@ -26,43 +26,69 @@ def main():
     parser = argparse.ArgumentParser()
 
     parser = argparse.ArgumentParser(add_help=True)
-    parser.add_argument('--swagger-dir', type=str, default='swagger/',
-                        help='output folder for converted Swagger files')
-    parser.add_argument('--merge-dir', type=str, default='defaults/',
-                        help='folder contains partial Swagger YAML files to merge with the WADL data')
-    parser.add_argument('--autofix', dest='autofix', action='store_true',
-                        help='fix common Swagger issues (rather than fixing them by standardizing WADL)')
-    parser.add_argument('--fail-fast', dest='failfast', action='store_true',
-                        help='Fail on the first problematic WADL or attempt to continue and convert the rest')
-    parser.add_argument('--strict', dest='strict', action='store_true',
-                        help='fail on data that cannot be converted or just print a warning and skip it')
-    parser.add_argument('--no-doc', dest='nodoc', action='store_true',
-                        help='Do not convert documentation tags, only semantically useful information about the API')
     parser.add_argument(
-        'wadl_file', nargs='+', metavar='WADL_FILE', help="wadl files to convert")
+        "--swagger-dir",
+        type=str,
+        default="swagger/",
+        help="output folder for converted Swagger files",
+    )
     parser.add_argument(
-        "-v", "--verbose", help="increase output verbosity", action="store_true")
+        "--merge-dir",
+        type=str,
+        default="defaults/",
+        help="folder contains partial Swagger YAML files to merge with the WADL data",
+    )
     parser.add_argument(
-        "-l", "--log-file", help="file for conversion log", default="wadl2swagger.log")
+        "--autofix",
+        dest="autofix",
+        action="store_true",
+        help="fix common Swagger issues (rather than fixing them by standardizing WADL)",
+    )
     parser.add_argument(
-        "-f", "--format", help="output format (json or yaml)", default="yaml")
+        "--fail-fast",
+        dest="failfast",
+        action="store_true",
+        help="Fail on the first problematic WADL or attempt to continue and convert the rest",
+    )
+    parser.add_argument(
+        "--strict",
+        dest="strict",
+        action="store_true",
+        help="fail on data that cannot be converted or just print a warning and skip it",
+    )
+    parser.add_argument(
+        "--no-doc",
+        dest="nodoc",
+        action="store_true",
+        help="Do not convert documentation tags, only semantically useful information about the API",
+    )
+    parser.add_argument(
+        "wadl_file", nargs="+", metavar="WADL_FILE", help="wadl files to convert"
+    )
+    parser.add_argument(
+        "-v", "--verbose", help="increase output verbosity", action="store_true"
+    )
+    parser.add_argument(
+        "-l", "--log-file", help="file for conversion log", default="wadl2swagger.log"
+    )
+    parser.add_argument(
+        "-f", "--format", help="output format (json or yaml)", default="yaml"
+    )
 
     args = parser.parse_args()
 
     failed = {}
 
     if args.verbose:
-        logging.basicConfig(
-            level=logging.DEBUG, filename=args.log_file, filemode='w')
+        logging.basicConfig(level=logging.DEBUG, filename=args.log_file, filemode="w")
     else:
-        logging.basicConfig(
-            level=logging.INFO, filename=args.log_file, filemode='w')
-    logging.getLogger('').addHandler(logging.StreamHandler())
+        logging.basicConfig(level=logging.INFO, filename=args.log_file, filemode="w")
+    logging.getLogger("").addHandler(logging.StreamHandler())
 
     for wadl_file in args.wadl_file:
         # better way to get basename w/out ext?
         filename, wadl_ext = os.path.splitext(os.path.split(wadl_file)[1])
-        swagger_file = os.path.join(args.swagger_dir, filename + '.' + args.format)
+        swagger_file = os.path.join(args.swagger_dir, filename + "." + args.format)
         mkdir_p(os.path.dirname(swagger_file))
         converter = SwaggerConverter(args)
         try:
@@ -86,17 +112,18 @@ def summarize_and_exit(failed):
         exit(0)
     else:
         logging.info("Failed to convert:")
-        for wadl_file, error in failed.iteritems():
+        for wadl_file, error in failed.items():
             logging.info("  %s : %s" % (wadl_file, error))
         exit(1)
 
 
 def save_swagger(swagger, filename, format):
-    with open(filename, 'w') as swagger_file:
-        if (format == "json"):
-            swagger_file.write(json.dumps(swagger, indent=4, separators=(',', ': ')))
+    with open(filename, "w") as swagger_file:
+        if format == "json":
+            swagger_file.write(json.dumps(swagger, indent=4, separators=(",", ": ")))
         else:
             swagger_file.write(yaml.dump(swagger, default_flow_style=False))
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
