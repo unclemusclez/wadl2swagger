@@ -8,6 +8,7 @@ from collections import OrderedDict
 import wadllib
 from wadltools.wadl import WADL, DocHelper, BadWADLError
 from wadllib.application import WADLError, UnsupportedMediaTypeError
+import wadllib.application
 
 
 class WADLParseError(Exception):
@@ -58,7 +59,9 @@ class SwaggerConverter:
 
             wadl = WADL.application_for(wadl_file)
             if self.autofix and wadl.resource_base is None:
-                self.logger.warn("Autofix: No base path, setting to http://localhost")
+                self.logger.warning(
+                    "Autofix: No base path, setting to http://localhost"
+                )
                 wadl.resource_base = "http://localhost"
             self.logger.debug("Reading WADL from %s", wadl_file)
             swagger = OrderedDict()
@@ -78,11 +81,14 @@ class SwaggerConverter:
 
             swagger["paths"] = OrderedDict()
 
-            for resource_element in wadl.resources:
+            for resource_element in wadl.resources or []:
                 path = resource_element.attrib["path"]
                 resource = wadl.get_resource_by_path(path)
+                if resource is None:
+                    self.logger.warning("Resource not found for path: %s", path)
+                    continue
                 if self.autofix and not path.startswith("/"):
-                    self.logger.warn("Autofix: Adding leading / to path")
+                    self.logger.warning("Autofix: Adding leading / to path")
                     path = "/" + path
                 swagger_resource = swagger["paths"][path] = OrderedDict()
                 self.logger.debug("  Processing resource for %s", path)
@@ -93,7 +99,7 @@ class SwaggerConverter:
                     try:
                         params = resource.parameters("application/json")
                     except (UnsupportedMediaTypeError, AttributeError):
-                        self.logger.warn(
+                        self.logger.warning(
                             "No support for application/json for resource at %s", path
                         )
                         params = []
@@ -119,7 +125,7 @@ class SwaggerConverter:
                     self.logger.debug("    Processing method %s %s", method.name, path)
                     verb = method.name
                     if self.autofix and verb == "copy":
-                        self.logger.warn(
+                        self.logger.warning(
                             "Autofix: Using PUT instead of COPY verb (OpenStack services accept either, Swagger does not allow COPY)"
                         )
                         verb = "put"
@@ -299,11 +305,11 @@ class SwaggerConverter:
         wadl_type = wadl_param.tag.get("type", "string")
         json_type = self.xsd_to_json_type(wadl_type)
         if json_type is None:
-            self.logger.warn(
+            self.logger.warning(
                 "Unknown type: %s for param %s", wadl_type, wadl_param.name
             )
             if self.autofix:
-                self.logger.warn("Using string for %s", wadl_type)
+                self.logger.warning("Using string for %s", wadl_type)
                 json_type = "string"
             else:
                 json_type = wadl_type
@@ -314,13 +320,13 @@ class SwaggerConverter:
 
         if self.autofix:
             if param["in"] == "body":
-                self.logger.warn(
+                self.logger.warning(
                     "Ignoring body parameter, converting these is not yet supported..."
                 )
                 return None
             if param["in"] == "path":
                 if param["required"] is not True:
-                    self.logger.warn(
+                    self.logger.warning(
                         "Autofix: path parameters must be required in Swagger (%s)",
                         param["name"],
                     )
@@ -334,15 +340,16 @@ class SwaggerConverter:
                 description = DocHelper.docbook_to_markdown(
                     DocHelper.doc_tag(wadl_param)
                 )
-                # Cleanup whitespace...
-                description = textwrap.dedent(description)
-                param["description"] = folded(description)
+                if description is not None:
+                    # Cleanup whitespace...
+                    description = textwrap.dedent(description)
+                    param["description"] = folded(description)
         return param
 
     def build_response(self, wadl_response):
         status = wadl_response.tag.attrib["status"]
         doc_tag = DocHelper.doc_tag(wadl_response)
-        if doc_tag is not None:
+        if doc_tag is not None and doc_tag.text is not None:
             description = " ".join(doc_tag.text.split())
         else:
             description = "%s response" % status
